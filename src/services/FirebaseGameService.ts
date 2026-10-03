@@ -3,6 +3,7 @@ import { DEFAULT_ROUNDS, GAME_CONFIG } from '../config/gameConfig'
 import { getImposterCount, nextRoundIndex, normalizeRoundConfiguration, scoreGuess, scoreVote, selectImposters, tallyVotes } from '../domain/gameLogic'
 import type { GamePhase, GameRoom, GameStateListener, Player, PlayerAssignment, PlayerGameState, RoundConfig, RoundResult, Scores, VotingState } from '../domain/types'
 import type { GameService } from './GameService'
+import { decodeRoundResult, type StoredRoundResult } from './firebaseSerialization'
 import { ensureAnonymousUser, firebaseDatabase } from './firebase'
 
 type JsonRecord = Record<string, unknown>
@@ -27,7 +28,7 @@ interface PublicState {
   configurationLocked: boolean
   scores: Scores
   voting?: PublicVoting | null
-  roundResult?: RoundResult | null
+  roundResult?: StoredRoundResult | null
   revealedImposterIds?: Record<string, boolean> | null
   revealedSecretWord?: string | null
   stateVersion: number
@@ -35,7 +36,7 @@ interface PublicState {
 
 interface HostState {
   imposterIds?: Record<string, boolean>
-  roundResult?: RoundResult | null
+  roundResult?: StoredRoundResult | null
 }
 
 interface AssignmentRecord {
@@ -134,7 +135,7 @@ export class FirebaseGameService implements GameService {
       configurationSaved: publicSnapshot.configurationSaved === true,
       configurationLocked: publicSnapshot.configurationLocked === true,
       voting: toVoting(publicSnapshot.voting),
-      roundResult: hostState.roundResult ?? publicSnapshot.roundResult ?? null,
+      roundResult: decodeRoundResult(hostState.roundResult ?? publicSnapshot.roundResult),
       version: Number(publicSnapshot.stateVersion ?? 0),
       createdAt: Number(meta.createdAt),
     }
@@ -211,7 +212,7 @@ export class FirebaseGameService implements GameService {
     return {
       code, players, phase: publicState.phase, currentRoundIndex: publicState.currentRoundIndex, imposterIds: [], imposterCount: publicState.imposterCount,
       scores: publicState.scores, rounds: [], configurationSaved: publicState.configurationSaved, configurationLocked: publicState.configurationLocked,
-      voting: toVoting(publicState.voting), roundResult: publicState.roundResult ?? null, version: publicState.stateVersion, createdAt: Number(joinSnapshot.child('createdAt').val() ?? 0),
+      voting: toVoting(publicState.voting), roundResult: decodeRoundResult(publicState.roundResult), version: publicState.stateVersion, createdAt: Number(joinSnapshot.child('createdAt').val() ?? 0),
     }
   }
 
@@ -459,7 +460,7 @@ export class FirebaseGameService implements GameService {
       code, version: publicState.stateVersion, phase: publicState.phase, currentRoundIndex: publicState.currentRoundIndex,
       player, players, scores: publicState.scores ?? { group: 0, imposters: 0 }, assignment,
       voting: publicState.voting ? { ...toVoting(publicState.voting)!, hasSubmitted: voteSnapshot.exists() && voteSnapshot.child('votingRound').val() === publicState.voting.votingRound } : null,
-      roundResult: publicState.roundResult ?? null,
+      roundResult: decodeRoundResult(publicState.roundResult),
       revealedImposterIds: objectIds(publicState.revealedImposterIds),
       revealedSecretWord: publicState.revealedSecretWord ?? null,
     }
