@@ -27,7 +27,7 @@ The Vite base path is `/imposter-game/`, matching the GitHub Pages project URL. 
 
 ## GitHub Pages deployment
 
-The workflow in `.github/workflows/deploy-pages.yml` installs dependencies, runs tests, builds the app, uploads `dist`, and deploys it.
+The workflow in `.github/workflows/deploy-pages.yml` installs dependencies, runs the application and Firebase rules tests, builds the app, deploys Realtime Database rules, and then deploys `dist`. Pages deployment cannot proceed if the rules deployment fails.
 
 ### Initial GitHub configuration
 
@@ -37,6 +37,15 @@ The workflow in `.github/workflows/deploy-pages.yml` installs dependencies, runs
 4. Push to the default branch (`master` for this checkout).
 5. Open the **Actions** tab and verify that **Test, build, and deploy to GitHub Pages** succeeds.
 6. Once deployed, open `https://jldeahr.github.io/imposter-game/`.
+
+### Firebase deployment authentication
+
+The workflow uses Google Workload Identity Federation so it does not need a long-lived service-account key. Configure these GitHub Actions repository secrets before running a production deployment:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: the complete provider resource name, such as `projects/123456789/locations/global/workloadIdentityPools/github/providers/imposter-game`.
+- `GCP_SERVICE_ACCOUNT`: the service-account email that GitHub Actions may impersonate.
+
+Grant that service account the Firebase Rules Admin role (`roles/firebaserules.admin`) on project `imposter-game-6c060`, and grant the repository's Workload Identity principal permission to impersonate it. The provider should restrict access to this repository. Without those secrets, GitHub cannot deploy `database.rules.json` and the release job will stop before publishing the site.
 
 If deployment does not start, verify that GitHub Pages is enabled for the repository and that the workflow still has its Pages-specific `pages: write` and `id-token: write` permissions. Those permissions are scoped only to the deployment job; broad repository write permissions are not needed.
 

@@ -46,6 +46,28 @@ beforeEach(async () => {
 afterAll(async () => environment.cleanup())
 
 describe('Realtime Database security boundaries', () => {
+  it('allows an authenticated host to create a complete room', async () => {
+    const host = environment.authenticatedContext('newHost').database()
+    const code = 'NEW234'
+    const createdAt = Date.now()
+
+    await assertSucceeds(set(ref(host, `rooms/${code}/meta`), { hostUid: 'newHost', createdAt }))
+    await assertSucceeds(update(ref(host), {
+      [`rooms/${code}/joinInfo`]: { phase: 'lobby', createdAt },
+      [`rooms/${code}/public`]: {
+        phase: 'lobby', currentRoundIndex: -1, category: '', playerCount: 0, imposterCount: 0,
+        configurationSaved: false, configurationLocked: false, scores: { group: 0, imposters: 0 }, stateVersion: 1,
+      },
+      [`rooms/${code}/config/rounds`]: {
+        0: { category: 'Places', secretWord: 'Library' },
+        1: { category: 'People', secretWord: 'Teacher' },
+        2: { category: 'Things', secretWord: 'Backpack' },
+      },
+      [`rooms/${code}/hostState`]: { imposterIds: {}, roundResult: null },
+    }))
+    await assertSucceeds(get(ref(host, `rooms/${code}/public`)))
+  })
+
   it('denies unauthenticated protected reads and unrelated-room access', async () => {
     await assertFails(get(ref(environment.unauthenticatedContext().database(), `rooms/${room}/public`)))
     await assertFails(get(ref(environment.authenticatedContext('player1').database(), 'rooms/OTHER99/public')))

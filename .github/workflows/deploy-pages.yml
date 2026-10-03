@@ -25,10 +25,17 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
       - name: Install dependencies
         run: npm ci
       - name: Run tests
         run: npm test
+      - name: Test Firebase Database rules
+        run: npm run test:rules
       - name: Build site
         run: npm run build
       - name: Configure Pages
@@ -40,7 +47,32 @@ jobs:
         with:
           path: dist
 
-  deploy:
+  deploy-rules:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name != 'pull_request' && needs.build.result == 'success'
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Deploy Firebase Database rules
+        run: npx firebase deploy --only database --project imposter-game-6c060 --non-interactive
+
+  deploy-pages:
     permissions:
       contents: read
       pages: write
@@ -49,8 +81,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name != 'pull_request' && needs.build.result == 'success'
+    needs: [build, deploy-rules]
+    if: github.event_name != 'pull_request' && needs.build.result == 'success' && needs.deploy-rules.result == 'success'
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
