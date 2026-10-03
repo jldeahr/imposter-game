@@ -35,6 +35,7 @@
         },
         "assignments": {
           ".read": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid",
           "$uid": {
             ".read": "auth != null && auth.uid === $uid && root.child('rooms').child($room).child('players').child(auth.uid).child('active').val() === true",
             ".write": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid",
@@ -43,6 +44,7 @@
         },
         "votes": {
           ".read": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid",
+          ".write": "auth != null && root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid",
           "$uid": {
             ".read": "auth != null && auth.uid === $uid",
             ".write": "auth != null && (root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid || (auth.uid === $uid && !data.exists() && newData.exists() && root.child('rooms').child($room).child('players').child(auth.uid).child('active').val() === true && (root.child('rooms').child($room).child('public').child('phase').val() === 'voting' || root.child('rooms').child($room).child('public').child('phase').val() === 'runoff-voting') && root.child('rooms').child($room).child('public').child('voting').child('manualResolutionRequired').val() !== true && newData.child('candidateUid').val() !== auth.uid && root.child('rooms').child($room).child('players').child(newData.child('candidateUid').val()).child('active').val() === true && root.child('rooms').child($room).child('public').child('voting').child('candidateIds').child(newData.child('candidateUid').val()).val() === true && newData.child('votingRound').val() === root.child('rooms').child($room).child('public').child('voting').child('votingRound').val()))",
