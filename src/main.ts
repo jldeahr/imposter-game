@@ -7,9 +7,12 @@ import type { GameRoom, Player, PlayerGameState } from './domain/types'
 import { RULES } from './rules'
 import { buildJoinUrl } from './routing'
 import { FirebaseGameService } from './services/FirebaseGameService'
+import type { GameService } from './services/GameService'
+import { LocalGameService } from './services/LocalGameService'
 
 const app = document.querySelector<HTMLDivElement>('#app')!
-const service = new FirebaseGameService()
+const isLocalGame = import.meta.env.DEV
+const service: GameService = isLocalGame ? new LocalGameService() : new FirebaseGameService()
 let unsubscribe: (() => void) | null = null
 let timer: TimerState = createTimer(GAME_CONFIG.discussionSeconds)
 let timerInterval: number | undefined
@@ -35,9 +38,24 @@ function stopTimer(): void { if (timerInterval !== undefined) window.clearInterv
 const formatTimer = (seconds: number): string => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 
 function renderHome(): void {
-  app.innerHTML = shell(`<section class="hero"><p class="eyebrow">A three-round party game</p><h1>Know the word.<br><span>Hide the truth.</span></h1><p class="hero-copy">Give a clever clue, spot the bluff, and privately vote from your phone.</p><div class="action-stack"><button class="button primary" id="create-game">Host a game <span>→</span></button><button class="button secondary" id="join-game">Join with a code</button></div><p class="demo-note"><span class="dot"></span> Live multiplayer powered by anonymous Firebase sessions</p></section>
+  const connectionNote = isLocalGame ? 'Local development mode' : 'Live multiplayer powered by anonymous Firebase sessions'
+  app.innerHTML = shell(`<section class="hero"><p class="eyebrow">A three-round party game</p><h1>Know the word.<br><span>Hide the truth.</span></h1><p class="hero-copy">Give a clever clue, spot the bluff, and privately vote from your phone.</p><div class="action-stack"><button class="button primary" id="create-game">Host a game <span>→</span></button><button class="button secondary" id="join-game">Join with a code</button></div><p class="demo-note"><span class="dot"></span> ${connectionNote}</p></section>
     <section class="how-it-works"><p class="eyebrow">How it works</p><div class="steps"><article><strong>01</strong><h2>Get your role</h2><p>Most players see the word. Imposters see only the category.</p></article><article><strong>02</strong><h2>Give one clue</h2><p>Use two words or fewer, then discuss for two minutes.</p></article><article><strong>03</strong><h2>Vote privately</h2><p>Choose a suspect in the app; ties automatically go to a runoff.</p></article></div></section>`)
-  document.querySelector('#create-game')?.addEventListener('click', async () => navigate(`/host/${(await service.createRoom()).code}`))
+  document.querySelector<HTMLButtonElement>('#create-game')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement
+    const originalContent = button.innerHTML
+    button.disabled = true
+    button.textContent = 'Creating game…'
+    try {
+      const room = await service.createRoom()
+      navigate(`/host/${room.code}`)
+    } catch (error) {
+      console.error('Could not create a game.', error)
+      showToast(errorMessage(error))
+      button.disabled = false
+      button.innerHTML = originalContent
+    }
+  })
   document.querySelector('#join-game')?.addEventListener('click', () => navigate('/join'))
 }
 
