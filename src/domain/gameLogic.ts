@@ -1,5 +1,5 @@
 import { GAME_CONFIG } from '../config/gameConfig'
-import type { Player, Scores } from './types'
+import type { Player, RoundConfig, Scores } from './types'
 
 export interface VoteTally { totals: Record<string, number>; leaders: string[]; highestCount: number }
 
@@ -41,6 +41,17 @@ export function addPlayer(players: Player[], player: Player): Player[] {
   return [...players, player]
 }
 
+export function normalizeRoundConfiguration(rounds: readonly RoundConfig[]): RoundConfig[] {
+  if (rounds.length !== GAME_CONFIG.rounds.length) throw new Error(`Exactly ${GAME_CONFIG.rounds.length} rounds are required.`)
+  return rounds.map((round, index) => {
+    const category = round.category.trim()
+    const secretWord = round.secretWord.trim()
+    if (!category) throw new Error(`Round ${index + 1} category is required.`)
+    if (!secretWord) throw new Error(`Round ${index + 1} secret word is required.`)
+    return { category, secretWord }
+  })
+}
+
 export function tallyVotes(ballots: Readonly<Record<string, string>>, candidateIds: readonly string[]): VoteTally {
   const totals: Record<string, number> = Object.fromEntries(candidateIds.map((id) => [id, 0]))
   for (const candidateId of Object.values(ballots)) if (candidateId in totals) totals[candidateId] += 1
@@ -48,9 +59,9 @@ export function tallyVotes(ballots: Readonly<Record<string, string>>, candidateI
   return { totals, highestCount, leaders: highestCount === 0 ? [...candidateIds] : candidateIds.filter((id) => totals[id] === highestCount) }
 }
 
-export function nextRoundIndex(currentRoundIndex: number): number | null {
+export function nextRoundIndex(currentRoundIndex: number, roundCount = GAME_CONFIG.rounds.length): number | null {
   const next = currentRoundIndex + 1
-  return next < GAME_CONFIG.rounds.length ? next : null
+  return next < roundCount ? next : null
 }
 
 export function scoreVote(scores: Scores, correct: boolean): Scores {

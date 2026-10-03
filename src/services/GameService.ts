@@ -1,10 +1,14 @@
-import type { GameRoom, GameStateListener, PlayerGameState } from '../domain/types'
+import type { GameRoom, GameStateListener, PlayerGameState, RoundConfig } from '../domain/types'
 
 export interface GameService {
+  initialize(): Promise<void>
+  getCurrentPlayerId(): Promise<string>
   createRoom(): Promise<GameRoom>
   getRoom(code: string): Promise<GameRoom | null>
   getGameState(code: string, playerId: string): Promise<PlayerGameState>
   subscribeToGameState(code: string, playerId: string | null, callback: GameStateListener): () => void
+  getRoundConfiguration(code: string): Promise<RoundConfig[]>
+  updateRoundConfiguration(code: string, rounds: RoundConfig[]): Promise<GameRoom>
   joinRoom(code: string, name: string): Promise<GameRoom>
   removePlayer(code: string, playerId: string): Promise<GameRoom>
   startRound(code: string): Promise<GameRoom>

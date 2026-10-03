@@ -1,15 +1,13 @@
-export interface RoundConfig {
-  number: number
-  category: string
-  secretWord: string
-}
+import type { RoundConfig } from '../domain/types'
+
+export const DEFAULT_ROUNDS: readonly RoundConfig[] = [
+  { category: 'Church', secretWord: 'Bible' },
+  { category: 'Holiday', secretWord: 'Christmas' },
+  { category: 'People We Know', secretWord: 'Adam Ingle' },
+]
 
 export const GAME_CONFIG = {
   discussionSeconds: 120,
   maxRunoffTies: 3,
-  rounds: [
-    { number: 1, category: 'Church', secretWord: 'Bible' },
-    { number: 2, category: 'Holiday', secretWord: 'Christmas' },
-    { number: 3, category: 'People We Know', secretWord: 'Adam Ingle' },
-  ] satisfies RoundConfig[],
+  rounds: DEFAULT_ROUNDS,
 } as const

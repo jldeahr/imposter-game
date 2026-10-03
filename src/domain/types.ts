@@ -1,5 +1,6 @@
 export interface Player { id: string; name: string; joinedAt: number }
 export interface Scores { group: number; imposters: number }
+export interface RoundConfig { category: string; secretWord: string }
 
 export type GamePhase = 'lobby' | 'role-reveal' | 'clue-giving' | 'discussion' | 'voting' | 'runoff-voting' | 'vote-result' | 'imposter-reveal' | 'imposter-word-guess' | 'round-result' | 'complete'
 
@@ -29,6 +30,9 @@ export interface GameRoom {
   imposterIds: string[]
   imposterCount: number
   scores: Scores
+  rounds: RoundConfig[]
+  configurationSaved: boolean
+  configurationLocked: boolean
   voting: VotingState | null
   roundResult: RoundResult | null
   version: number

@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Open the URL printed by Vite. Create a room, add demo players from the host dashboard, and use each player’s role link to simulate passing a phone around.
+Open the URL printed by Vite. Create a room, configure the category and secret word for each of the three rounds, add demo players, and open player views in separate tabs to exercise automatic phase updates and private in-app voting.
 
 ## Tests and production build
 
@@ -44,17 +44,17 @@ The deployed URL will be `https://jldeahr.github.io/imposter-game/`.
 
 ## Architecture
 
-- `src/config/gameConfig.ts` contains all three categories and secret words plus player/timer limits.
-- `src/domain/` contains framework-independent imposter selection, room limits, round progression, scoring, and timer logic.
+- `src/config/gameConfig.ts` contains the default round configuration plus timer/runoff settings. Each room receives its own editable copy of the three rounds.
+- `src/domain/` contains framework-independent imposter-count selection, random assignments, vote tallying, round progression, scoring, and timer logic.
 - `src/services/GameService.ts` is the boundary between the UI and multiplayer state.
-- `src/services/LocalGameService.ts` is the current same-browser demo implementation.
+- `src/services/LocalGameService.ts` is the current same-browser demo implementation. It owns validated room-specific round setup, configuration locking, the phase state machine, private ballots, monotonic versions, and subscriptions.
 - `src/main.ts` contains the hash router and views; `src/style.css` contains the design system and responsive layout.
 
 The UI only calls the `GameService` interface. A future remote service can replace `LocalGameService` without rewriting the screens or game rules.
 
 ## Current multiplayer limitation
 
-This version is a **same-device demo**, not networked multiplayer. One room is stored in `localStorage` so host and player views can be tested in the same browser. A player ID is also stored in `sessionStorage` after joining. Neither storage mechanism synchronizes between phones, and the interface says so explicitly.
+This version is a **same-browser demo**, not networked multiplayer. One room is stored in `localStorage`; a custom event updates views in the current tab and the browser `storage` event updates other tabs. A monotonic room version rejects stale notifications. This does not synchronize separate phones, and the interface says so explicitly.
 
 The QR code renders the eventual public join URL, but scanning it on another phone cannot find the room until a shared backend exists.
 
@@ -63,12 +63,13 @@ The QR code renders the eventual public join URL, but scanning it on another pho
 A small serverless backend and a remote `GameService` implementation should eventually provide:
 
 - create a room with an expiration time;
-- join a room, capped at 25 players;
+- join a room without a configured hard capacity;
 - list and remove players for the host;
-- start each round and securely create private assignments;
+- securely store host-configured rounds, authorize host-only setup access, and lock configuration once play starts;
+- start each round and securely create private assignments using the automatic 1/2/3 imposter thresholds;
 - return only the requesting player’s private assignment;
-- reveal a round, record scores, and advance/reset the game;
-- let clients receive or poll for state changes; and
+- accept private ballots, tally/run off votes, resolve results, record scoring, and advance/reset the game;
+- push versioned state changes with WebSockets, Server-Sent Events, or polling; and
 - automatically expire old rooms and their temporary names/state.
 
 The backend—not the static GitHub Pages bundle—must be authoritative for secret assignments and shared room state. A modest serverless function plus a short-lived key/value store is enough; no accounts or permanent player history are needed.

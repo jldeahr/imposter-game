@@ -1,9 +1,9 @@
-import { GAME_CONFIG } from '../config/gameConfig'
-import { addPlayer, getImposterCount, nextRoundIndex, scoreGuess, scoreVote, selectImposters, tallyVotes } from '../domain/gameLogic'
-import type { GamePhase, GameRoom, GameStateListener, PlayerAssignment, PlayerGameState } from '../domain/types'
+import { DEFAULT_ROUNDS, GAME_CONFIG } from '../config/gameConfig'
+import { addPlayer, getImposterCount, nextRoundIndex, normalizeRoundConfiguration, scoreGuess, scoreVote, selectImposters, tallyVotes } from '../domain/gameLogic'
+import type { GamePhase, GameRoom, GameStateListener, PlayerAssignment, PlayerGameState, RoundConfig } from '../domain/types'
 import type { GameService } from './GameService'
 
-const STORAGE_KEY = 'imposter-game:demo-room:v2'
+const STORAGE_KEY = 'imposter-game:demo-room:v3'
 const CHANGE_EVENT = 'imposter-game:changed'
 
 interface StoredRoom extends GameRoom { ballots: Record<string, string> }
@@ -20,10 +20,19 @@ function makeCode(): string {
 
 function publicRoom(room: StoredRoom): GameRoom {
   const { ballots: _privateBallots, ...safe } = room
-  return clone(safe)
+  const result = clone(safe)
+  if (!['imposter-reveal', 'imposter-word-guess', 'round-result', 'complete'].includes(room.phase)) result.imposterIds = []
+  if (result.roundResult && !result.roundResult.suspectRevealed) result.roundResult.selectedWasImposter = false
+  return result
 }
 
 export class LocalGameService implements GameService {
+  private lastPlayerId: string | null = null
+  async initialize(): Promise<void> {}
+  async getCurrentPlayerId(): Promise<string> {
+    if (!this.lastPlayerId) throw new Error('No local player has joined yet.')
+    return this.lastPlayerId
+  }
   private load(): StoredRoom | null {
     const value = localStorage.getItem(STORAGE_KEY)
     return value ? JSON.parse(value) as StoredRoom : null
@@ -47,10 +56,10 @@ export class LocalGameService implements GameService {
   }
 
   private assignment(room: StoredRoom, playerId: string): PlayerAssignment {
-    const round = GAME_CONFIG.rounds[room.currentRoundIndex]
+    const round = room.rounds[room.currentRoundIndex]
     if (!round || !room.players.some((player) => player.id === playerId)) throw new Error('Assignment is not available.')
     const isImposter = room.imposterIds.includes(playerId)
-    return { playerId, roundNumber: round.number, category: round.category, isImposter, secretWord: isImposter ? null : round.secretWord }
+    return { playerId, roundNumber: room.currentRoundIndex + 1, category: round.category, isImposter, secretWord: isImposter ? null : round.secretWord }
   }
 
   private playerState(room: StoredRoom, playerId: string): PlayerGameState {
@@ -61,11 +70,11 @@ export class LocalGameService implements GameService {
     return {
       code: room.code, version: room.version, phase: room.phase, currentRoundIndex: room.currentRoundIndex,
       player: clone(player), players: clone(room.players), scores: clone(room.scores),
-      assignment: room.currentRoundIndex >= 0 && room.phase !== 'complete' ? this.assignment(room, playerId) : null,
+      assignment: room.currentRoundIndex >= 0 && ['role-reveal', 'clue-giving', 'discussion', 'voting', 'runoff-voting'].includes(room.phase) ? this.assignment(room, playerId) : null,
       voting: room.voting ? { ...clone(room.voting), hasSubmitted: playerId in room.ballots } : null,
-      roundResult: room.roundResult ? clone(room.roundResult) : null,
+      roundResult: room.roundResult ? { ...clone(room.roundResult), selectedWasImposter: room.roundResult.suspectRevealed ? room.roundResult.selectedWasImposter : false } : null,
       revealedImposterIds: showImposters ? [...room.imposterIds] : [],
-      revealedSecretWord: showWord ? GAME_CONFIG.rounds[room.currentRoundIndex]?.secretWord ?? null : null,
+      revealedSecretWord: showWord ? room.rounds[room.currentRoundIndex]?.secretWord ?? null : null,
     }
   }
 
@@ -97,7 +106,7 @@ export class LocalGameService implements GameService {
   }
 
   async createRoom(): Promise<GameRoom> {
-    return this.save({ code: makeCode(), players: [], phase: 'lobby', currentRoundIndex: -1, imposterIds: [], imposterCount: 0, scores: { group: 0, imposters: 0 }, voting: null, roundResult: null, ballots: {}, version: 0, createdAt: Date.now() })
+    return this.save({ code: makeCode(), players: [], phase: 'lobby', currentRoundIndex: -1, imposterIds: [], imposterCount: 0, scores: { group: 0, imposters: 0 }, rounds: DEFAULT_ROUNDS.map((round) => ({ ...round })), configurationSaved: false, configurationLocked: false, voting: null, roundResult: null, ballots: {}, version: 0, createdAt: Date.now() })
   }
 
   async getRoom(code: string): Promise<GameRoom | null> {
@@ -125,12 +134,27 @@ export class LocalGameService implements GameService {
     return () => { active = false; window.removeEventListener(CHANGE_EVENT, localListener); window.removeEventListener('storage', storageListener) }
   }
 
+  async getRoundConfiguration(code: string): Promise<RoundConfig[]> {
+    return clone(this.requireRoom(code).rounds)
+  }
+
+  async updateRoundConfiguration(code: string, rounds: RoundConfig[]): Promise<GameRoom> {
+    const room = this.requireRoom(code)
+    this.requirePhase(room, 'lobby')
+    if (room.configurationLocked) throw new Error('Game setup is locked after play begins.')
+    room.rounds = normalizeRoundConfiguration(rounds)
+    room.configurationSaved = true
+    return this.save(room)
+  }
+
   async joinRoom(code: string, rawName: string): Promise<GameRoom> {
     const room = this.requireRoom(code)
     if (room.phase !== 'lobby' && room.phase !== 'round-result') throw new Error('Players can only join between rounds.')
     const name = rawName.trim().replace(/\s+/g, ' ').slice(0, 24)
     if (!name) throw new Error('Enter a nickname first.')
-    room.players = addPlayer(room.players, { id: makeId(), name, joinedAt: Date.now() })
+    const id = makeId()
+    this.lastPlayerId = id
+    room.players = addPlayer(room.players, { id, name, joinedAt: Date.now() })
     return this.save(room)
   }
 
@@ -145,6 +169,8 @@ export class LocalGameService implements GameService {
   async startRound(code: string): Promise<GameRoom> {
     const room = this.requireRoom(code); this.requirePhase(room, 'lobby')
     if (!room.players.length) throw new Error('Add at least one demo player first.')
+    if (!room.configurationSaved) throw new Error('Save the game setup before starting.')
+    room.configurationLocked = true
     this.beginRound(room, 0); return this.save(room)
   }
 
@@ -215,7 +241,7 @@ export class LocalGameService implements GameService {
 
   async advanceRound(code: string): Promise<GameRoom> {
     const room = this.requireRoom(code); this.requirePhase(room, 'round-result')
-    const next = nextRoundIndex(room.currentRoundIndex)
+    const next = nextRoundIndex(room.currentRoundIndex, room.rounds.length)
     if (next === null) return this.finishGame(code)
     this.beginRound(room, next); return this.save(room)
   }
@@ -224,7 +250,7 @@ export class LocalGameService implements GameService {
 
   async resetGame(code: string): Promise<GameRoom> {
     const room = this.requireRoom(code); this.requirePhase(room, 'complete')
-    room.phase = 'lobby'; room.currentRoundIndex = -1; room.imposterIds = []; room.imposterCount = 0; room.scores = { group: 0, imposters: 0 }; room.ballots = {}; room.voting = null; room.roundResult = null
+    room.phase = 'lobby'; room.currentRoundIndex = -1; room.imposterIds = []; room.imposterCount = 0; room.scores = { group: 0, imposters: 0 }; room.configurationLocked = false; room.ballots = {}; room.voting = null; room.roundResult = null
     return this.save(room)
   }
 }
