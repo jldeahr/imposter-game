@@ -1,4 +1,3 @@
-import QRCode from 'qrcode'
 import './style.css'
 import { GAME_CONFIG } from './config/gameConfig'
 import { getImposterCount } from './domain/gameLogic'
@@ -6,6 +5,7 @@ import { createTimer, resetTimer, startTimer, tickTimer, type TimerState } from 
 import type { GameRoom, Player, PlayerGameState } from './domain/types'
 import { RULES } from './rules'
 import { buildJoinUrl } from './routing'
+import { createQrCodeSvg } from './qrCode'
 import { FirebaseGameService } from './services/FirebaseGameService'
 import type { GameService } from './services/GameService'
 import { LocalGameService } from './services/LocalGameService'
@@ -143,7 +143,16 @@ function bindTimerEvents(): void {
 
 function bindHostEvents(room: GameRoom, joinUrl: string): void {
   if (room.phase === 'lobby') {
-    const canvas = document.createElement('canvas'); QRCode.toCanvas(canvas, joinUrl, { width: 196, margin: 1 }).then(() => document.querySelector('#qr-code')?.append(canvas)).catch(() => showToast('Could not draw the QR preview.'))
+    const qrContainer = document.querySelector<HTMLDivElement>('#qr-code')
+    if (qrContainer) {
+      createQrCodeSvg(joinUrl)
+        .then((svg) => {
+          // A live-room update may have replaced this element while the QR was
+          // generated. Never attach stale output to a newer render.
+          if (qrContainer.isConnected) qrContainer.innerHTML = svg
+        })
+        .catch(() => showToast('Could not draw the QR preview.'))
+    }
     document.querySelector('#copy-link')?.addEventListener('click', async () => { await navigator.clipboard.writeText(joinUrl); showToast('Join link copied.', 'success') })
     document.querySelector('#start-round')?.addEventListener('click', () => void run(() => service.startRound(room.code)))
     document.querySelector('#edit-setup')?.addEventListener('click', () => { editingSetups.add(room.code); renderHostState(room) })

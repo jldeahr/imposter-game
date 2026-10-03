@@ -93,7 +93,7 @@ input:focus { border-color: var(--lime); box-shadow: 0 0 0 3px rgba(217,255,101,
 .empty-state { margin: 6px 0 20px; padding: 32px 15px; color: var(--muted); border: 1px dashed var(--line); border-radius: 14px; text-align: center; }
 .invite-panel { text-align: center; }
 .qr-code { display: grid; place-items: center; width: 214px; height: 214px; margin: 12px auto 16px; padding: 9px; background: white; border-radius: 16px; }
-.qr-code canvas { max-width: 100%; height: auto !important; }
+.qr-code svg { display: block; width: 196px; max-width: 100%; height: auto; }
 .join-url { overflow-wrap: anywhere; color: var(--muted); font-size: .73rem; }
 .fine-print { margin: 14px 0 0; color: #767482; font-size: .76rem; line-height: 1.5; }
 .round-strip { display: flex; justify-content: space-between; margin: -8px -8px 28px; padding: 11px 14px; color: var(--muted); background: var(--bg); border-radius: 11px; font-size: .78rem; font-weight: 700; }

@@ -21,7 +21,7 @@
         "players": {
           ".read": "auth != null && (root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid || data.child(auth.uid).child('active').val() === true)",
           "$uid": {
-            ".write": "auth != null && (root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid || (auth.uid === $uid && newData.child('active').val() === true && (!data.exists() || (newData.child('displayName').val() === data.child('displayName').val() && newData.child('joinedAt').val() === data.child('joinedAt').val())) && (root.child('rooms').child($room).child('joinInfo').child('phase').val() === 'lobby' || root.child('rooms').child($room).child('joinInfo').child('phase').val() === 'round-result')))",
+            ".write": "auth != null && (root.child('rooms').child($room).child('meta').child('hostUid').val() === auth.uid || (auth.uid === $uid && newData.child('active').val() === true && (root.child('rooms').child($room).child('joinInfo').child('phase').val() === 'lobby' || root.child('rooms').child($room).child('joinInfo').child('phase').val() === 'round-result')))",
             ".validate": "!newData.exists() || (newData.hasChildren(['displayName', 'joinedAt', 'active']) && newData.child('displayName').isString() && newData.child('displayName').val().length > 0 && newData.child('displayName').val().length <= 24 && newData.child('joinedAt').isNumber() && newData.child('active').isBoolean())"
           }
         },

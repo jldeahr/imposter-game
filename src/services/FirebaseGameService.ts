@@ -203,11 +203,10 @@ export class FirebaseGameService implements GameService {
     const phase = String(joinSnapshot.child('phase').val())
     if (phase !== 'lobby' && phase !== 'round-result') throw new Error('This room is closed to new players right now.')
     const playerRef = ref(firebaseDatabase, roomPath(code, `players/${user.uid}`))
-    const result = await runTransaction(playerRef, (current: { displayName?: string; joinedAt?: number; active?: boolean } | null) => {
-      if (current?.displayName) return { ...current, active: true }
-      return { displayName: name, joinedAt: Date.now(), active: true }
-    }, { applyLocally: false })
-    if (!result.committed) throw new Error('Could not join this room.')
+    // A transaction reads before writing, but non-members intentionally cannot
+    // read the player roster. A direct write lets the join rule validate the
+    // new member without exposing existing player data first.
+    await set(playerRef, { displayName: name, joinedAt: Date.now(), active: true })
     const [publicState, players] = await Promise.all([this.readPublic(code), this.readPlayers(code)])
     return {
       code, players, phase: publicState.phase, currentRoundIndex: publicState.currentRoundIndex, imposterIds: [], imposterCount: publicState.imposterCount,

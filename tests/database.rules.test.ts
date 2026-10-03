@@ -73,6 +73,28 @@ describe('Realtime Database security boundaries', () => {
     await assertFails(get(ref(environment.authenticatedContext('player1').database(), 'rooms/OTHER99/public')))
   })
 
+  it('allows a player to join an open room without prior roster read access', async () => {
+    await environment.withSecurityRulesDisabled(async (context) => {
+      await update(ref(context.database(), `rooms/${room}/joinInfo`), { phase: 'lobby' })
+      await update(ref(context.database(), `rooms/${room}/public`), { phase: 'lobby' })
+    })
+    const newcomer = environment.authenticatedContext('newPlayer').database()
+    const player = { displayName: 'Casey', joinedAt: Date.now(), active: true }
+
+    await assertFails(get(ref(newcomer, `rooms/${room}/players`)))
+    await assertSucceeds(set(ref(newcomer, `rooms/${room}/players/newPlayer`), player))
+    await assertSucceeds(get(ref(newcomer, `rooms/${room}/players`)))
+    await assertSucceeds(get(ref(newcomer, `rooms/${room}/public`)))
+  })
+
+  it('rejects joining as another user or while the room is closed', async () => {
+    const newcomer = environment.authenticatedContext('newPlayer').database()
+    const player = { displayName: 'Casey', joinedAt: Date.now(), active: true }
+
+    await assertFails(set(ref(newcomer, `rooms/${room}/players/someoneElse`), player))
+    await assertFails(set(ref(newcomer, `rooms/${room}/players/newPlayer`), player))
+  })
+
   it('allows members to read public state and their own assignment only', async () => {
     const player = environment.authenticatedContext('player1').database()
     await assertSucceeds(get(ref(player, `rooms/${room}/public`)))
