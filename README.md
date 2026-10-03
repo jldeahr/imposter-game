@@ -27,7 +27,7 @@ The Vite base path is `/imposter-game/`, matching the GitHub Pages project URL. 
 
 ## GitHub Pages deployment
 
-The workflow in `.github/workflows/deploy-pages.yml` installs dependencies, runs the application and Firebase rules tests, builds the app, deploys Realtime Database rules, and then deploys `dist`. Pages deployment cannot proceed if the rules deployment fails.
+The workflow in `.github/workflows/deploy-pages.yml` automatically installs dependencies, runs the application and Firebase rules tests, builds the Vite app, and deploys `dist` to GitHub Pages. GitHub Pages deployment is independent of Firebase database rules deployment.
 
 ### Initial GitHub configuration
 
@@ -38,16 +38,19 @@ The workflow in `.github/workflows/deploy-pages.yml` installs dependencies, runs
 5. Open the **Actions** tab and verify that **Test, build, and deploy to GitHub Pages** succeeds.
 6. Once deployed, open `https://jldeahr.github.io/imposter-game/`.
 
-### Firebase deployment authentication
+### Manual Firebase database rules deployment
 
-The workflow uses Google Workload Identity Federation so it does not need a long-lived service-account key. Configure these GitHub Actions repository secrets before running a production deployment:
+Firebase Realtime Database rules are deployed manually from a developer machine, not by GitHub Actions. Whenever `database.rules.json` changes, run:
 
-- `GCP_WORKLOAD_IDENTITY_PROVIDER`: the complete provider resource name, such as `projects/123456789/locations/global/workloadIdentityPools/github/providers/imposter-game`.
-- `GCP_SERVICE_ACCOUNT`: the service-account email that GitHub Actions may impersonate.
+```bash
+npx firebase-tools login
+npx firebase-tools use imposter-game-6c060
+npx firebase-tools deploy --only database
+```
 
-Grant that service account the Firebase Rules Admin role (`roles/firebaserules.admin`) on project `imposter-game-6c060`, and grant the repository's Workload Identity principal permission to impersonate it. The provider should restrict access to this repository. Without those secrets, GitHub cannot deploy `database.rules.json` and the release job will stop before publishing the site.
+The Firebase emulator and rules tests remain part of the project and run in the GitHub Pages workflow, but they do not deploy rules. No Google Cloud service-account key, `GCP_WORKLOAD_IDENTITY_PROVIDER` GitHub secret, or `GCP_SERVICE_ACCOUNT` GitHub secret is required. Do not add long-lived service-account JSON credentials to GitHub Secrets as a workaround.
 
-If deployment does not start, verify that GitHub Pages is enabled for the repository and that the workflow still has its Pages-specific `pages: write` and `id-token: write` permissions. Those permissions are scoped only to the deployment job; broad repository write permissions are not needed.
+If Pages deployment does not start, verify that GitHub Pages is enabled for the repository and that the workflow still has its Pages-specific `pages: write` and `id-token: write` permissions. The `id-token: write` permission is used by GitHub Pages deployment, not Google Cloud authentication; broad repository write permissions are not needed.
 
 The deployed URL will be `https://jldeahr.github.io/imposter-game/`.
 

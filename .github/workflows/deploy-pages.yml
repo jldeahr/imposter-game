@@ -47,42 +47,6 @@ jobs:
         with:
           path: dist
 
-  deploy-rules:
-    permissions:
-      contents: read
-      id-token: write
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.event_name != 'pull_request' && needs.build.result == 'success'
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Validate Google Cloud authentication settings
-        shell: bash
-        env:
-          WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-        run: |
-          if [[ -z "$WORKLOAD_IDENTITY_PROVIDER" || -z "$SERVICE_ACCOUNT" ]]; then
-            echo "::error::Configure the GCP_WORKLOAD_IDENTITY_PROVIDER and GCP_SERVICE_ACCOUNT repository secrets before deploying Firebase rules."
-            exit 1
-          fi
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
-        with:
-          project_id: imposter-game-6c060
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-      - name: Deploy Firebase Database rules
-        run: npx firebase deploy --only database --project imposter-game-6c060 --non-interactive
-
   deploy-pages:
     permissions:
       contents: read
@@ -92,8 +56,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: [build, deploy-rules]
-    if: github.event_name != 'pull_request' && needs.build.result == 'success' && needs.deploy-rules.result == 'success'
+    needs: build
+    if: github.event_name != 'pull_request' && needs.build.result == 'success'
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
