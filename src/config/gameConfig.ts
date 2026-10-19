@@ -3,7 +3,7 @@ import type { RoundConfig } from '../domain/types'
 export const DEFAULT_ROUNDS: readonly RoundConfig[] = [
   { category: 'Church', secretWord: 'Bible' },
   { category: 'Holiday', secretWord: 'Christmas' },
-  { category: 'People We Know', secretWord: 'Adam Ingle' },
+  { category: 'People We Know', secretWord: 'George Washington' },
 ]
 
 export const GAME_CONFIG = {
